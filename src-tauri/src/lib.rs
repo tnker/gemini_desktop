@@ -33,7 +33,7 @@ pub fn run() {
                     if (window.innerWidth >= 960) {
                         bar.style.background = '#1e1f20';
                     } else {
-                        bar.style.background = '#000000';
+                        bar.style.background = 'transparent';
                     }
                 };
                 // 初回実行と画面リサイズ時のイベント登録
