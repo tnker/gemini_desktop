@@ -10,14 +10,7 @@
     "frontendDist": "https://gemini.google.com/app"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Gemini Desktop",
-        "width": 800,
-        "height": 600,
-        "decorations": false
-      }
-    ],
+    "withGlobalTauri": true,
     "security": {
       "csp": null
     }
