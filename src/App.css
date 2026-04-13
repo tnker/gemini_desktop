@@ -1,0 +1,84 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #131314; /* Gemini Dark Mode Background */
+  color: #e3e3e3;
+  overflow: hidden; /* WebViewにスクロールを任せるため本体は隠す */
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.titlebar {
+  height: 40px;
+  background: #202124; /* Gemini風のトップバーの色 */
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  border-bottom: 1px solid #3c4043;
+}
+
+.titlebar-title {
+  padding-left: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e3e3e3;
+  flex-grow: 1; /* ドラッグ可能な領域を広げる */
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.titlebar-buttons {
+  display: flex;
+  height: 100%;
+}
+
+.titlebar-buttons button {
+  background: transparent;
+  border: none;
+  color: #e3e3e3;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.titlebar-buttons button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.titlebar-buttons button:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.webview-placeholder {
+  margin-top: 40px;
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2rem;
+}
