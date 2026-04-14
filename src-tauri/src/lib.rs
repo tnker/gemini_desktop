@@ -157,16 +157,23 @@ pub fn run() {
             "#;
 
             let url = "https://gemini.google.com/app".parse().unwrap();
-            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
+            let window = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
                 .title("Gemini Desktop")
                 .inner_size(800.0, 600.0)
                 .decorations(false)
+                .visible(false) // 状態復元まで隠しておく（フラッシュ防止）
                 .initialization_script(script)
                 .build()
                 .unwrap();
 
+            // ウィンドウ生成後に状態を復元（サイズ、位置など）
+            use tauri_plugin_window_state::{WindowExt, StateFlags};
+            let _ = window.restore_state(StateFlags::all());
+            let _ = window.show();
+
             Ok(())
         })
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
