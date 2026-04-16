@@ -12,6 +12,7 @@ pub fn run() {
         .setup(|app| {
             let script = r#"
             function injectTitlebar() {
+                if (window !== window.top) return;
                 if (!document.body) return;
                 if (document.getElementById('tauri-custom-titlebar')) return;
                 
@@ -152,19 +153,55 @@ pub fn run() {
             }
 
             // ページロード時や、SPAでDOMが書き換えられた後にも対応できるように定期監視
-            setInterval(injectTitlebar, 500);
-            window.addEventListener('DOMContentLoaded', injectTitlebar);
+            if (window === window.top) {
+                setInterval(injectTitlebar, 500);
+                window.addEventListener('DOMContentLoaded', injectTitlebar);
+            }
             "#;
 
             let url = "https://gemini.google.com/app".parse().unwrap();
-            let window = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
+            let mut builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
                 .title("Gemini Desktop")
                 .inner_size(800.0, 600.0)
                 .decorations(false)
                 .visible(false) // 状態復元まで隠しておく（フラッシュ防止）
-                .initialization_script(script)
-                .build()
-                .unwrap();
+                .initialization_script(script);
+
+            // コマンドライン引数を取得し、初期入力テキストとして利用する
+            let args: Vec<String> = std::env::args().collect();
+            if args.len() > 1 {
+                let initial_query = args[1..].join(" ");
+                // 安全にJS文字列化
+                if let Ok(js_query) = serde_json::to_string(&initial_query) {
+                    let auto_input_script = format!(r#"
+                        window.addEventListener('DOMContentLoaded', () => {{
+                            const targetText = {};
+                            if (!targetText) return;
+                            
+                            const tryInject = () => {{
+                                // Geminiのチャット入力欄
+                                const editor = document.querySelector('rich-textarea div[contenteditable="true"], div[contenteditable="true"][role="textbox"]');
+                                // 見つかり、かつまだ入力されていない場合
+                                if (editor && editor.textContent.trim() === '') {{
+                                    editor.focus();
+                                    document.execCommand('insertText', false, targetText);
+                                    return true;
+                                }}
+                                return false;
+                            }};
+
+                            const int = setInterval(() => {{
+                                if (tryInject()) clearInterval(int);
+                            }}, 500);
+                            
+                            setTimeout(() => clearInterval(int), 15000);
+                        }});
+                    "#, js_query);
+                    builder = builder.initialization_script(&auto_input_script);
+                }
+            }
+
+            let window = builder.build().unwrap();
 
             // ウィンドウ生成後に状態を復元（サイズ、位置など）
             use tauri_plugin_window_state::{WindowExt, StateFlags};
@@ -173,6 +210,46 @@ pub fn run() {
 
             Ok(())
         })
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // 他のインスタンスが起動されたときに呼ばれる（自分自身がプライマリインスタンス）
+            if let Some(window) = app.get_webview_window("main") {
+                // ウィンドウを前面に出す
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+
+                // 引数があればGeminiのチャット欄に入力する
+                if args.len() > 1 {
+                    let initial_query = args[1..].join(" ");
+                    if let Ok(js_query) = serde_json::to_string(&initial_query) {
+                        let eval_script = format!(r#"
+                            (function() {{
+                                const targetText = {};
+                                if (!targetText) return;
+                                
+                                const tryInject = () => {{
+                                    const editor = document.querySelector('rich-textarea div[contenteditable="true"], div[contenteditable="true"][role="textbox"]');
+                                    // 既に何らかのテキストがある場合は追記、またはクリアしてから入力するかですが、挙動上一旦そのまま execCommand します
+                                    if (editor) {{
+                                        editor.focus();
+                                        document.execCommand('insertText', false, targetText);
+                                        return true;
+                                    }}
+                                    return false;
+                                }};
+
+                                if (!tryInject()) {{
+                                    const int = setInterval(() => {{
+                                        if (tryInject()) clearInterval(int);
+                                    }}, 500);
+                                    setTimeout(() => clearInterval(int), 10000);
+                                }}
+                            }})();
+                        "#, js_query);
+                        let _ = window.eval(&eval_script);
+                    }
+                }
+            }
+        }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .run(tauri::generate_context!())
