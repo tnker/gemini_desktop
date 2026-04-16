@@ -1,0 +1,66 @@
+name: "Build and Release"
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  # GitHub UI 上から手動実行できるようにする
+  workflow_dispatch:
+
+jobs:
+  build:
+    # release を作成するための権限
+    permissions:
+      contents: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "windows-latest"
+            args: ""
+          - platform: "macos-14" # M1/M2 (ARM)
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-13" # Intel Mac
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-14' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build Tauri app and create release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # tauri.conf.json 内のバージョンに自動で置換されます
+          tagName: v__VERSION__
+          releaseName: "Gemini Desktop v__VERSION__"
+          releaseBody: "自動生成されたリリースビルドです。Assets から実行形式（.exe, .dmg, .AppImage等）をダウンロードしてください。"
+          # true にすると下書き(Draft)として作成されるため、確認してから公開できます
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
